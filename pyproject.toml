@@ -1,0 +1,26 @@
+[project]
+name = "math-gen-graph"
+version = "0.1.0"
+description = "Beautiful interactive and static visualizations of mathematician advisor-advisee genealogies"
+readme = "README.md"
+authors = [
+    { name = "nreff", email = "89307895+nreff@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "graphviz>=0.21",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "networkx>=3.6.1",
+    "pydantic>=2.12.5",
+    "rich>=14.3.2",
+    "typer>=0.21.1",
+    "websockets>=16.0",
+]
+
+[project.scripts]
+math-gen-graph = "math_gen_graph.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.8.22,<0.9.0"]
+build-backend = "uv_build"

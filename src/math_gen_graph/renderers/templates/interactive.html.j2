@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} — Math Genealogy Graph</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: {{ theme.font_family }};
+            background-color: {{ theme.bg_color }};
+            color: {{ theme.font_color }};
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ---- Sidebar ---- */
+        #sidebar {
+            width: 300px;
+            min-width: 300px;
+            background-color: {{ sidebar_bg }};
+            border-right: 1px solid {{ sidebar_border }};
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        #sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid {{ sidebar_border }};
+        }
+
+        #sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: {{ theme.highlight_color }};
+        }
+
+        #sidebar-header .subtitle {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        #search-box {
+            padding: 12px 20px;
+            border-bottom: 1px solid {{ sidebar_border }};
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid {{ sidebar_border }};
+            border-radius: 6px;
+            background: {{ search_bg }};
+            color: {{ theme.font_color }};
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #search-input:focus {
+            border-color: {{ theme.highlight_color }};
+        }
+
+        #search-input::placeholder {
+            opacity: 0.4;
+        }
+
+        /* ---- Legend ---- */
+        #legend {
+            padding: 16px 20px;
+            border-bottom: 1px solid {{ sidebar_border }};
+        }
+
+        #legend h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin-bottom: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 0;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .legend-item:hover {
+            opacity: 0.7;
+        }
+
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .legend-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ---- Node Detail Panel ---- */
+        #node-detail {
+            padding: 16px 20px;
+            flex: 1;
+        }
+
+        #node-detail h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin-bottom: 10px;
+        }
+
+        #node-detail-content {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        #node-detail-content .detail-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: {{ theme.highlight_color }};
+            margin-bottom: 8px;
+        }
+
+        #node-detail-content .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid {{ sidebar_border }};
+        }
+
+        #node-detail-content .detail-label {
+            opacity: 0.5;
+            font-size: 12px;
+        }
+
+        #node-detail-content .detail-value {
+            font-weight: 500;
+            text-align: right;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #node-detail-content .detail-link {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: {{ theme.highlight_color }}20;
+            color: {{ theme.highlight_color }};
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        #node-detail-content .detail-link:hover {
+            background: {{ theme.highlight_color }}40;
+        }
+
+        #node-detail-content .detail-flag {
+            width: 20px;
+            height: 14px;
+            vertical-align: middle;
+            margin-right: 4px;
+            border-radius: 2px;
+            box-shadow: 0 0 1px rgba(0,0,0,0.3);
+        }
+
+        /* ---- Overlays panel ---- */
+        #overlays {
+            padding: 16px 20px;
+            border-bottom: 1px solid {{ sidebar_border }};
+        }
+
+        #overlays h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin-bottom: 10px;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+        }
+
+        .toggle-label {
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .toggle-sublabel {
+            font-size: 10px;
+            opacity: 0.4;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: {{ sidebar_border }};
+            border-radius: 20px;
+            transition: background-color 0.2s;
+        }
+
+        .toggle-slider::before {
+            content: "";
+            position: absolute;
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: {{ theme.bg_color }};
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: {{ theme.highlight_color }};
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(16px);
+        }
+
+        /* ---- Stats ---- */
+        #stats {
+            padding: 12px 20px;
+            border-top: 1px solid {{ sidebar_border }};
+            font-size: 11px;
+            opacity: 0.4;
+        }
+
+        /* ---- Graph container ---- */
+        #graph-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ---- Controls overlay ---- */
+        #controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            gap: 6px;
+            z-index: 5;
+        }
+
+        .ctrl-btn {
+            padding: 8px 12px;
+            border: 1px solid {{ sidebar_border }};
+            border-radius: 6px;
+            background: {{ sidebar_bg }};
+            color: {{ theme.font_color }};
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .ctrl-btn:hover {
+            border-color: {{ theme.highlight_color }};
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <h1>Math Genealogy</h1>
+            <div class="subtitle">{{ node_count }} mathematicians &middot; {{ edge_count }} connections</div>
+        </div>
+
+        <div id="search-box">
+            <input type="text" id="search-input" placeholder="Search by name or institution..." />
+        </div>
+
+        <div id="legend">
+            <h3>{{ color_by_label }}</h3>
+            {% for label, color in legend.items() %}
+            <div class="legend-item" data-label="{{ label }}">
+                <div class="legend-swatch" style="background-color: {{ color }};"></div>
+                <div class="legend-label" title="{{ label }}">{{ label }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="overlays">
+            <h3>Overlays</h3>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <span>Generation Levels</span>
+                    <span class="toggle-sublabel">{{ max_depth + 1 }} generations</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-generations" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <span>Century Lines</span>
+                    <span class="toggle-sublabel">Horizontal time markers</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-centuries" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div id="node-detail">
+            <h3>Selected Node</h3>
+            <div id="node-detail-content">
+                <div style="opacity: 0.4; font-size: 12px;">Click a node to see details</div>
+            </div>
+        </div>
+
+        <div id="stats">
+            Generated by math-gen-graph &middot; Data from the Mathematics Genealogy Project
+        </div>
+    </div>
+
+    <div id="graph-container">
+        <div id="controls">
+            <button class="ctrl-btn" onclick="network.fit()">Fit</button>
+            <button class="ctrl-btn" onclick="togglePhysics()">Toggle Physics</button>
+        </div>
+        <div id="network"></div>
+    </div>
+
+    <script>
+        // ---- Graph data ----
+        var nodesData = new vis.DataSet({{ nodes_json }});
+        var edgesData = new vis.DataSet({{ edges_json }});
+
+        // ---- Network options ----
+        var options = {
+            nodes: {
+                shape: "{{ theme.node_shape }}",
+                font: {
+                    face: "{{ theme.font_family }}",
+                    size: {{ theme.font_size }},
+                    color: "{{ theme.font_color }}",
+                    multi: "html"
+                },
+                borderWidth: {{ theme.node_border_width }},
+                borderWidthSelected: {{ theme.node_border_width + 1 }},
+                shadow: {
+                    enabled: true,
+                    color: "rgba(0,0,0,0.15)",
+                    size: 8,
+                    x: 2,
+                    y: 2
+                },
+                margin: { top: 10, bottom: 10, left: 12, right: 12 },
+                widthConstraint: { minimum: 120, maximum: 220 },
+                chosen: {
+                    node: function(values, id, selected, hovering) {
+                        if (selected || hovering) {
+                            values.shadow = true;
+                            values.shadowSize = 15;
+                            values.borderWidth = {{ theme.node_border_width + 2 }};
+                            values.borderColor = "{{ theme.highlight_color }}";
+                        }
+                    }
+                }
+            },
+            edges: {
+                color: {
+                    color: "{{ theme.edge_color }}",
+                    highlight: "{{ theme.edge_highlight_color }}",
+                    hover: "{{ theme.edge_highlight_color }}",
+                    opacity: 0.8
+                },
+                width: 1.5,
+                smooth: {
+                    enabled: true,
+                    type: "{{ 'cubicBezier' if layout_type == 'hierarchical' else 'continuous' }}",
+                    roundness: 0.4
+                },
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.5,
+                        type: "arrow"
+                    }
+                },
+                hoverWidth: 0.5,
+                selectionWidth: 1
+            },
+            physics: {
+                {% if layout_type == "hierarchical" %}
+                enabled: true,
+                hierarchicalRepulsion: {
+                    centralGravity: 0.0,
+                    springLength: 150,
+                    springConstant: 0.01,
+                    nodeDistance: 180,
+                    damping: 0.09,
+                    avoidOverlap: 0.5
+                },
+                solver: "hierarchicalRepulsion"
+                {% elif layout_type == "force" %}
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -3000,
+                    centralGravity: 0.3,
+                    springLength: 120,
+                    springConstant: 0.04,
+                    damping: 0.09,
+                    avoidOverlap: 0.3
+                },
+                solver: "barnesHut",
+                stabilization: {
+                    enabled: true,
+                    iterations: 200
+                }
+                {% else %}
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -2000,
+                    centralGravity: 0.5,
+                    springLength: 100,
+                    springConstant: 0.05,
+                    damping: 0.1,
+                    avoidOverlap: 0.2
+                },
+                solver: "barnesHut"
+                {% endif %}
+            },
+            {% if layout_type == "hierarchical" %}
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: "UD",
+                    sortMethod: "directed",
+                    levelSeparation: 160,
+                    nodeSpacing: 140,
+                    treeSpacing: 200,
+                    blockShifting: true,
+                    edgeMinimization: true,
+                    parentCentralization: true
+                }
+            },
+            {% else %}
+            layout: {
+                improvedLayout: true,
+                hierarchical: false
+            },
+            {% endif %}
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                navigationButtons: false,
+                keyboard: {
+                    enabled: true,
+                    speed: { x: 10, y: 10, zoom: 0.02 }
+                },
+                zoomView: true,
+                dragView: true,
+                multiselect: false
+            }
+        };
+
+        // ---- Create the network ----
+        var container = document.getElementById("network");
+        var network = new vis.Network(container, { nodes: nodesData, edges: edgesData }, options);
+
+        var physicsEnabled = true;
+        function togglePhysics() {
+            physicsEnabled = !physicsEnabled;
+            network.setOptions({ physics: { enabled: physicsEnabled } });
+        }
+
+        // ---- Search ----
+        var searchInput = document.getElementById("search-input");
+        searchInput.addEventListener("input", function() {
+            var query = this.value.toLowerCase().trim();
+            if (!query) {
+                // Reset all nodes to original appearance
+                nodesData.forEach(function(node) {
+                    nodesData.update({ id: node.id, opacity: 1.0, font: { color: "{{ theme.font_color }}" } });
+                });
+                return;
+            }
+            nodesData.forEach(function(node) {
+                var name = (node.fullName || "").toLowerCase();
+                var inst = (node.institution || "").toLowerCase();
+                var matches = name.includes(query) || inst.includes(query);
+                nodesData.update({
+                    id: node.id,
+                    opacity: matches ? 1.0 : 0.15,
+                    font: { color: matches ? "{{ theme.font_color }}" : "{{ theme.font_color }}40" }
+                });
+            });
+        });
+
+        // ---- Node click detail ----
+        network.on("click", function(params) {
+            var detailDiv = document.getElementById("node-detail-content");
+            if (params.nodes.length > 0) {
+                var nodeId = params.nodes[0];
+                var node = nodesData.get(nodeId);
+
+                // Build institution value with flag if available
+                var instValue = escapeHtml(node.institution || "Unknown");
+                if (node.flagUrl) {
+                    instValue = '<img class="detail-flag" src="' + node.flagUrl + '" alt="flag" onerror="this.style.display=\'none\'" />' + instValue;
+                }
+                if (node.country && node.country !== node.institution) {
+                    instValue += ' <span style="opacity:0.5; font-size:11px;">(' + escapeHtml(node.country) + ')</span>';
+                }
+
+                var html =
+                    '<div class="detail-name">' + escapeHtml(node.fullName) + '</div>' +
+                    '<div class="detail-row"><span class="detail-label">Institution</span><span class="detail-value">' + instValue + '</span></div>' +
+                    '<div class="detail-row"><span class="detail-label">Year</span><span class="detail-value">' + (node.year || "Unknown") + '</span></div>' +
+                    '<div class="detail-row"><span class="detail-label">Advisors</span><span class="detail-value">' + node.numAdvisors + '</span></div>' +
+                    '<div class="detail-row"><span class="detail-label">Students</span><span class="detail-value">' + node.numDescendants + '</span></div>' +
+                    '<div class="detail-row"><span class="detail-label">MGP ID</span><span class="detail-value"><a href="https://www.mathgenealogy.org/id.php?id=' + nodeId + '" target="_blank" style="color:{{ theme.highlight_color }}">' + nodeId + '</a></span></div>';
+
+                // Wikipedia link
+                if (node.wikipediaUrl) {
+                    html += '<a class="detail-link" href="' + node.wikipediaUrl + '" target="_blank">View on Wikipedia &rarr;</a>';
+                }
+
+                detailDiv.innerHTML = html;
+            } else {
+                detailDiv.innerHTML = '<div style="opacity: 0.4; font-size: 12px;">Click a node to see details</div>';
+            }
+        });
+
+        // ---- Legend click to highlight ----
+        document.querySelectorAll(".legend-item").forEach(function(item) {
+            item.addEventListener("click", function() {
+                var label = this.dataset.label;
+                nodesData.forEach(function(node) {
+                    var matches = node.groupLabel === label;
+                    nodesData.update({
+                        id: node.id,
+                        opacity: matches ? 1.0 : 0.15,
+                        font: { color: matches ? "{{ theme.font_color }}" : "{{ theme.font_color }}40" }
+                    });
+                });
+            });
+        });
+
+        function escapeHtml(text) {
+            var div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ---- Overlay state ----
+        var showGenerations = false;
+        var showCenturies = false;
+        var overlayData = { generationBands: [], centuryLines: [] };
+        var centuryYears = {{ century_years_json }};
+        var maxDepth = {{ max_depth }};
+
+        document.getElementById("toggle-generations").addEventListener("change", function() {
+            showGenerations = this.checked;
+            network.redraw();
+        });
+        document.getElementById("toggle-centuries").addEventListener("change", function() {
+            showCenturies = this.checked;
+            network.redraw();
+        });
+
+        // Compute overlay geometry from current node positions
+        function recomputeOverlays() {
+            var positions = network.getPositions();
+            var allNodes = nodesData.get();
+            if (!allNodes.length) return;
+
+            // -- Generation bands: group nodes by depth, find Y range per level --
+            // Note: depth 0 = leaf nodes (bottom), higher = older ancestors (top)
+            var depthGroups = {};
+            for (var i = 0; i < allNodes.length; i++) {
+                var n = allNodes[i];
+                var d = n.depth !== undefined ? n.depth : 0;
+                var pos = positions[n.id];
+                if (!pos) continue;
+                if (!depthGroups[d]) depthGroups[d] = { minY: pos.y, maxY: pos.y, minX: Infinity, maxX: -Infinity };
+                depthGroups[d].minY = Math.min(depthGroups[d].minY, pos.y);
+                depthGroups[d].maxY = Math.max(depthGroups[d].maxY, pos.y);
+                depthGroups[d].minX = Math.min(depthGroups[d].minX, pos.x);
+                depthGroups[d].maxX = Math.max(depthGroups[d].maxX, pos.x);
+            }
+
+            // Find global X extent for bands
+            var globalMinX = Infinity, globalMaxX = -Infinity;
+            for (var key in depthGroups) {
+                globalMinX = Math.min(globalMinX, depthGroups[key].minX);
+                globalMaxX = Math.max(globalMaxX, depthGroups[key].maxX);
+            }
+            var xPad = 300;
+
+            // Build sorted band list with midpoint boundaries between levels
+            // Sort by Y position (top-to-bottom on screen) so bands follow visual order
+            var depths = Object.keys(depthGroups).map(Number).sort(function(a, b) {
+                var midA = (depthGroups[a].minY + depthGroups[a].maxY) / 2;
+                var midB = (depthGroups[b].minY + depthGroups[b].maxY) / 2;
+                return midA - midB;
+            });
+            var bands = [];
+            for (var di = 0; di < depths.length; di++) {
+                var dKey = depths[di];
+                var grp = depthGroups[dKey];
+                var midY = (grp.minY + grp.maxY) / 2;
+
+                // Band extends from midpoint with previous level to midpoint with next level
+                var topY, botY;
+                if (di === 0) {
+                    topY = grp.minY - 80;
+                } else {
+                    var prevGrp = depthGroups[depths[di - 1]];
+                    topY = ((prevGrp.minY + prevGrp.maxY) / 2 + midY) / 2;
+                }
+                if (di === depths.length - 1) {
+                    botY = grp.maxY + 80;
+                } else {
+                    var nextGrp = depthGroups[depths[di + 1]];
+                    botY = (midY + (nextGrp.minY + nextGrp.maxY) / 2) / 2;
+                }
+
+                bands.push({
+                    depth: dKey,
+                    topY: topY,
+                    botY: botY,
+                    leftX: globalMinX - xPad,
+                    rightX: globalMaxX + xPad,
+                    label: "Gen " + dKey
+                });
+            }
+            overlayData.generationBands = bands;
+
+            // -- Century lines: piecewise interpolation from actual node positions --
+            // This handles non-uniform year spacing correctly by interpolating
+            // between the real Y positions of nodes nearest each century boundary.
+            if (centuryYears.length > 0) {
+                // Collect (year, Y) pairs from nodes that have a year
+                var yearYPairs = [];
+                for (var j = 0; j < allNodes.length; j++) {
+                    var nd = allNodes[j];
+                    if (nd.year && positions[nd.id]) {
+                        yearYPairs.push({ year: nd.year, y: positions[nd.id].y });
+                    }
+                }
+                if (yearYPairs.length < 2) {
+                    overlayData.centuryLines = [];
+                    return;
+                }
+
+                // Sort by year
+                yearYPairs.sort(function(a, b) { return a.year - b.year; });
+
+                // Build median Y per unique year for cleaner interpolation
+                var yearMedians = [];
+                var curYear = yearYPairs[0].year;
+                var curYs = [yearYPairs[0].y];
+                for (var k = 1; k < yearYPairs.length; k++) {
+                    if (yearYPairs[k].year === curYear) {
+                        curYs.push(yearYPairs[k].y);
+                    } else {
+                        curYs.sort(function(a, b) { return a - b; });
+                        yearMedians.push({ year: curYear, y: curYs[Math.floor(curYs.length / 2)] });
+                        curYear = yearYPairs[k].year;
+                        curYs = [yearYPairs[k].y];
+                    }
+                }
+                curYs.sort(function(a, b) { return a - b; });
+                yearMedians.push({ year: curYear, y: curYs[Math.floor(curYs.length / 2)] });
+
+                // Piecewise linear interpolation: find Y for a given year
+                function yearToY(yr) {
+                    // Clamp to data range with extrapolation from nearest segment
+                    if (yr <= yearMedians[0].year) {
+                        if (yearMedians.length < 2) return yearMedians[0].y;
+                        var seg = yearMedians[1].year - yearMedians[0].year;
+                        if (seg === 0) return yearMedians[0].y;
+                        var slope = (yearMedians[1].y - yearMedians[0].y) / seg;
+                        return yearMedians[0].y + slope * (yr - yearMedians[0].year);
+                    }
+                    if (yr >= yearMedians[yearMedians.length - 1].year) {
+                        if (yearMedians.length < 2) return yearMedians[yearMedians.length - 1].y;
+                        var last = yearMedians.length - 1;
+                        var seg2 = yearMedians[last].year - yearMedians[last - 1].year;
+                        if (seg2 === 0) return yearMedians[last].y;
+                        var slope2 = (yearMedians[last].y - yearMedians[last - 1].y) / seg2;
+                        return yearMedians[last].y + slope2 * (yr - yearMedians[last].year);
+                    }
+                    // Find bracketing pair and interpolate
+                    for (var m = 0; m < yearMedians.length - 1; m++) {
+                        if (yr >= yearMedians[m].year && yr <= yearMedians[m + 1].year) {
+                            var span = yearMedians[m + 1].year - yearMedians[m].year;
+                            if (span === 0) return yearMedians[m].y;
+                            var t = (yr - yearMedians[m].year) / span;
+                            return yearMedians[m].y + t * (yearMedians[m + 1].y - yearMedians[m].y);
+                        }
+                    }
+                    return yearMedians[0].y;
+                }
+
+                var lines = [];
+                for (var ci = 0; ci < centuryYears.length; ci++) {
+                    var cYear = centuryYears[ci];
+                    lines.push({
+                        year: cYear,
+                        y: yearToY(cYear),
+                        leftX: globalMinX - xPad,
+                        rightX: globalMaxX + xPad,
+                        label: String(cYear)
+                    });
+                }
+                overlayData.centuryLines = lines;
+            }
+        }
+
+        // ---- Canvas drawing for overlays ----
+        network.on("beforeDrawing", function(ctx) {
+            if (!showGenerations && !showCenturies) return;
+
+            ctx.save();
+
+            // Generation level bands
+            if (showGenerations && overlayData.generationBands.length > 0) {
+                var bandColors = ["{{ theme.highlight_color }}10", "{{ theme.highlight_color }}06"];
+                var bands = overlayData.generationBands;
+                for (var i = 0; i < bands.length; i++) {
+                    var b = bands[i];
+                    ctx.fillStyle = bandColors[i % 2];
+                    ctx.fillRect(b.leftX, b.topY, b.rightX - b.leftX, b.botY - b.topY);
+
+                    // Dashed line at the top boundary of each band
+                    if (i > 0) {
+                        ctx.beginPath();
+                        ctx.setLineDash([6, 4]);
+                        ctx.strokeStyle = "{{ theme.highlight_color }}30";
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(b.leftX, b.topY);
+                        ctx.lineTo(b.rightX, b.topY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+
+                    // Label on BOTH edges
+                    var bandMidY = (b.topY + b.botY) / 2;
+                    ctx.font = "bold 14px {{ theme.font_family }}";
+                    ctx.fillStyle = "{{ theme.font_color }}70";
+                    ctx.textBaseline = "middle";
+                    // Left label
+                    ctx.textAlign = "left";
+                    ctx.fillText(b.label, b.leftX + 14, bandMidY);
+                    // Right label
+                    ctx.textAlign = "right";
+                    ctx.fillText(b.label, b.rightX - 14, bandMidY);
+                }
+            }
+
+            // Century lines
+            if (showCenturies && overlayData.centuryLines.length > 0) {
+                var lines = overlayData.centuryLines;
+                for (var j = 0; j < lines.length; j++) {
+                    var ln = lines[j];
+
+                    // Horizontal line -- more visible
+                    ctx.beginPath();
+                    ctx.setLineDash([10, 5]);
+                    ctx.strokeStyle = "{{ theme.highlight_color }}50";
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(ln.leftX, ln.y);
+                    ctx.lineTo(ln.rightX, ln.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Year label on BOTH edges
+                    ctx.font = "bold 15px {{ theme.font_family }}";
+                    ctx.fillStyle = "{{ theme.highlight_color }}90";
+                    ctx.textBaseline = "bottom";
+                    // Right label
+                    ctx.textAlign = "right";
+                    ctx.fillText(ln.label, ln.rightX - 14, ln.y - 5);
+                    // Left label
+                    ctx.textAlign = "left";
+                    ctx.fillText(ln.label, ln.leftX + 14, ln.y - 5);
+                }
+            }
+
+            ctx.restore();
+        });
+
+        // ---- Multi-tree separation ----
+        var numTrees = {{ num_trees }};
+
+        function separateTrees() {
+            if (numTrees < 2) return;
+
+            var positions = network.getPositions();
+            var allNodes = nodesData.get();
+            if (!allNodes.length) return;
+
+            // Group exclusive nodes by tree index, collect shared nodes
+            var treeNodes = {};  // treeIndex -> [{id, x, y}, ...]
+            var sharedNodes = [];
+            for (var i = 0; i < allNodes.length; i++) {
+                var n = allNodes[i];
+                var pos = positions[n.id];
+                if (!pos) continue;
+                if (n.treeIndex >= 0) {
+                    if (!treeNodes[n.treeIndex]) treeNodes[n.treeIndex] = [];
+                    treeNodes[n.treeIndex].push({ id: n.id, x: pos.x, y: pos.y });
+                } else {
+                    sharedNodes.push({ id: n.id, x: pos.x, y: pos.y });
+                }
+            }
+
+            // Compute the center of mass for each exclusive tree
+            var treeCenters = {};
+            for (var ti in treeNodes) {
+                var nodes = treeNodes[ti];
+                var sumX = 0;
+                for (var j = 0; j < nodes.length; j++) sumX += nodes[j].x;
+                treeCenters[ti] = sumX / nodes.length;
+            }
+
+            // Compute the overall center of shared nodes (the "spine")
+            var sharedCenterX = 0;
+            if (sharedNodes.length > 0) {
+                for (var s = 0; s < sharedNodes.length; s++) sharedCenterX += sharedNodes[s].x;
+                sharedCenterX /= sharedNodes.length;
+            } else {
+                // No shared nodes; use global center
+                var allX = allNodes.map(function(n) { return positions[n.id] ? positions[n.id].x : 0; });
+                sharedCenterX = allX.reduce(function(a, b) { return a + b; }, 0) / allX.length;
+            }
+
+            // Sort tree indices by their current center-of-mass x position
+            // so we preserve left-right ordering from the layout
+            var treeIndices = Object.keys(treeNodes).map(Number).sort(function(a, b) {
+                return treeCenters[a] - treeCenters[b];
+            });
+
+            // Compute the maximum horizontal extent of any single tree
+            var maxTreeSpan = 0;
+            for (var tk in treeNodes) {
+                var xs = treeNodes[tk].map(function(n) { return n.x; });
+                var span = Math.max.apply(null, xs) - Math.min.apply(null, xs);
+                if (span > maxTreeSpan) maxTreeSpan = span;
+            }
+
+            // The separation offset: push each tree so there's clear space between them
+            // Use at least 400px or half the widest tree span, whichever is bigger
+            var gapPerTree = Math.max(400, maxTreeSpan * 0.4);
+
+            // Assign target x-offset for each tree, centered around the shared spine
+            var totalSpread = gapPerTree * (treeIndices.length - 1);
+            var treeTargetOffsets = {};
+            for (var idx = 0; idx < treeIndices.length; idx++) {
+                // Spread evenly: first tree to the left, last to the right
+                treeTargetOffsets[treeIndices[idx]] = -totalSpread / 2 + idx * gapPerTree;
+            }
+
+            // Move exclusive nodes: shift each tree so its center aligns with its target offset
+            // Disable physics first so nodes stay put
+            network.setOptions({ physics: { enabled: false } });
+            physicsEnabled = false;
+
+            for (var tm in treeNodes) {
+                var currentCenter = treeCenters[tm];
+                var targetX = sharedCenterX + treeTargetOffsets[tm];
+                var dx = targetX - currentCenter;
+                var tNodes = treeNodes[tm];
+                for (var tn = 0; tn < tNodes.length; tn++) {
+                    network.moveNode(tNodes[tn].id, tNodes[tn].x + dx, tNodes[tn].y);
+                }
+            }
+
+            // Keep shared nodes where they are (centered)
+        }
+
+        // Fit the network after stabilization, separate trees, compute overlays
+        network.once("stabilizationIterationsDone", function() {
+            network.fit({ animation: { duration: 500, easingFunction: "easeInOutQuad" } });
+            setTimeout(function() {
+                separateTrees();
+                recomputeOverlays();
+                // Re-fit after separation to show the full spread
+                setTimeout(function() {
+                    network.fit({ animation: { duration: 300, easingFunction: "easeInOutQuad" } });
+                }, 100);
+            }, 600);
+        });
+
+        // Recompute overlays when the user drags/zooms to keep labels positioned
+        network.on("dragEnd", function() { recomputeOverlays(); });
+    </script>
+</body>
+</html>
