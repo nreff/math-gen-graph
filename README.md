@@ -2,6 +2,10 @@
 
 Beautiful interactive and static visualizations of mathematician advisor-advisee genealogies, powered by data from the [Mathematics Genealogy Project](https://www.mathgenealogy.org/).
 
+
+
+![Screenshot](assets/screenshot1.PNG)
+
 ## Features
 
 - **Interactive HTML graphs** -- zoom, pan, drag nodes, hover for details, search by name or institution, click legend entries to filter
